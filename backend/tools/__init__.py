@@ -1,0 +1,1 @@
+# HomePilot AI — Tools Module
