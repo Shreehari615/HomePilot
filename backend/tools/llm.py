@@ -1,8 +1,8 @@
 """
 HomePilot AI — LLM Factory
 
-Creates and manages the Chat Model instance. Supports both
-Google Gemini and OpenAI as providers (configured via LLM_PROVIDER env var).
+Creates and manages the Chat Model instance. Supports OpenAI
+as the provider (configured via LLM_PROVIDER env var).
 """
 
 from __future__ import annotations
@@ -24,50 +24,36 @@ def get_llm() -> BaseChatModel:
     """
     Get or create the shared Chat Model instance.
 
-    Supports 'gemini' and 'openai' providers via LLM_PROVIDER env var.
+    Supports 'openai' provider via LLM_PROVIDER env var.
     Returns a cached singleton to avoid re-initializing on every call.
     """
     settings = get_settings()
     provider = settings.llm_provider.lower()
 
-    if provider == "gemini":
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        model_name = settings.gemini_model
-        logger.info("llm_initialized", provider="gemini", model=model_name)
-        return ChatGoogleGenerativeAI(
-            model=model_name,
-            google_api_key=settings.google_api_key,
-            temperature=0.3,
-            max_retries=3,
-            timeout=60,
-        )
-    elif provider == "openai":
-        from langchain_openai import ChatOpenAI
-        model_name = settings.openai_model
-        logger.info("llm_initialized", provider="openai", model=model_name)
-        kwargs = {
-            "model": model_name,
-            "api_key": settings.openai_api_key,
-            "temperature": 0.3,
-            "max_retries": 3,
-            "request_timeout": 180,
-        }
-        if settings.openai_base_url:
-            kwargs["base_url"] = settings.openai_base_url
-            
-        return ChatOpenAI(**kwargs)
-    else:
+    if provider != "openai":
         raise ValueError(
-            f"Unknown LLM_PROVIDER '{provider}'. Use 'gemini' or 'openai'."
+            f"Unknown or unsupported LLM_PROVIDER '{provider}'. Only 'openai' is supported."
         )
+
+    from langchain_openai import ChatOpenAI
+    model_name = settings.openai_model
+    logger.info("llm_initialized", provider="openai", model=model_name)
+    kwargs = {
+        "model": model_name,
+        "api_key": settings.openai_api_key,
+        "temperature": 0.3,
+        "max_retries": 3,
+        "request_timeout": 180,
+    }
+    if settings.openai_base_url:
+        kwargs["base_url"] = settings.openai_base_url
+        
+    return ChatOpenAI(**kwargs)
 
 
 def get_model_name() -> str:
     """Get the current model name for logging."""
     settings = get_settings()
-    provider = settings.llm_provider.lower()
-    if provider == "gemini":
-        return settings.gemini_model
     return settings.openai_model
 
 

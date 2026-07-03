@@ -25,16 +25,12 @@ class Settings(BaseSettings):
     debug: bool = Field(default=True, alias="DEBUG")
 
     # ── LLM Provider ─────────────────────────────────────────────────────
-    llm_provider: str = Field(default="gemini", alias="LLM_PROVIDER")
+    llm_provider: str = Field(default="openai", alias="LLM_PROVIDER")
 
     # ── OpenAI ───────────────────────────────────────────────────────────
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     openai_base_url: Optional[str] = Field(default=None, alias="OPENAI_BASE_URL")
-
-    # ── Google Gemini ────────────────────────────────────────────────────
-    google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
-    gemini_model: str = Field(default="gemini-2.0-flash", alias="GEMINI_MODEL")
 
     # ── Database ─────────────────────────────────────────────────────────
     database_url: str = Field(
