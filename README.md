@@ -25,9 +25,9 @@ HomePilot AI is a **production-ready** autonomous property discovery agent built
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                        Frontend (React + Vite)               │
-│  ┌────────┐  ┌──────────┐  ┌───────────────┐  ┌──────────┐ │
-│  │  Home   │  │   Chat   │  │ Property View │  │  Browse  │ │
-│  └────────┘  └──────────┘  └───────────────┘  └──────────┘ │
+│  ┌─────────┐  ┌──────────┐  ┌───────────────┐  ┌──────────┐  │
+│  │  Home   │  │   Chat   │  │ Property View │  │  Browse  │  │
+│  └─────────┘  └──────────┘  └───────────────┘  └──────────┘  │
 └────────────────────────┬─────────────────────────────────────┘
                          │  REST API (axios)
 ┌────────────────────────┴─────────────────────────────────────┐
@@ -35,13 +35,26 @@ HomePilot AI is a **production-ready** autonomous property discovery agent built
 │  ┌──────────────────────────────────────────────────────────┐│
 │  │                    LangGraph Agent                       ││
 │  │                                                          ││
-│  │  START → Planner → Router → [Tools] → Ranker → Explain  ││
-│  │                        │                                  ││
-│  │     ┌──────────────────┼──────────────────┐              ││
-│  │     ▼         ▼        ▼         ▼        ▼              ││
-│  │  Property  Google    School    Crime   Neighborhood      ││
-│  │  Search    Maps      Tool     Tool    Tool               ││
-│  │            + Price History                                ││
+│  │            START → initialize_node → agent_node          ││
+│  │                            ▲            │                ││
+│  │                            │      (should_continue?)     ││
+│  │                            │      /            \         ││
+│  │                      [tools_node]          [submit_node] ││
+│  │                                                 │        ││
+│  │                                                 ▼        ││
+│  │                                              ranking     ││
+│  │                                                 │        ││
+│  │                                                 ▼        ││
+│  │                                            explanation   ││
+│  │                                                 │        ││
+│  │                                                 ▼        ││
+│  │                                             response     ││
+│  │                                                 │        ││
+│  │                                                 ▼        ││
+│  │                                           memory_update  ││
+│  │                                                 │        ││
+│  │                                                 ▼        ││
+│  │                                                END       ││
 │  └──────────────────────────────────────────────────────────┘│
 │  ┌──────────────────┐  ┌─────────────────────┐              │
 │  │  SQLite (state)   │  │  ChromaDB (vectors) │              │
@@ -51,20 +64,14 @@ HomePilot AI is a **production-ready** autonomous property discovery agent built
 
 ### LangGraph Agent Flow
 
-```
-START → planner → should_search?
-                    ├── search → should_enrich?
-                    │              ├── enrich → ranking → explanation → response → memory → END
-                    │              └── ranking → explanation → response → memory → END
-                    ├── enrich_only → ranking → explanation → response → memory → END
-                    └── respond → memory → END
-```
-
-The **planner** uses the LLM to:
-1. Classify user intent (new search / refine / compare / clarify / general question)
-2. Extract preferences (city, budget, bedrooms, etc.)
-3. Decide which tools to invoke
-4. Adjust ranking weights dynamically
+1. **initialize_node**: Sets up the state, retrieves any previously shown properties from the database to support contextual follow-ups, and prepares the message history.
+2. **agent_node**: Binds the specialized search and enrichment tools alongside `submit_recommendations`, running the LLM to decide on actions.
+3. **tools_node**: Executes any tool calls (e.g. `property_search`, `google_maps_tool`, `school_tool`) in parallel. Searches populate new properties, while enrichment tools update properties in the state in-place.
+4. **submit_node**: Captures the final intent, preferences, weights, and reply when the LLM completes its planning.
+5. **ranking**: Calculates deterministic scores based on the dynamic weights.
+6. **explanation**: Generates transparent, priority-linked pros, cons, and recommendations.
+7. **response**: Standardizes the final conversational output.
+8. **memory_update**: Updates preferences and weights in the conversation context, commits messages, and saves state to SQLite and ChromaDB.
 
 ---
 
@@ -299,10 +306,29 @@ User: "Focus on the safest areas"
 
 ---
 
+## ⚖️ Trade-offs
+
+- **Flexibility vs. Latency**: Giving the LLM direct control over tool invocation via an agentic loop allows it to handle highly complex and non-standard inquiries dynamically (e.g. searching first, observing areas, and then calling commute tools). However, this multi-step planning loop can take multiple turns (LLM calls), which increases overall latency compared to a single-turn hardcoded pipeline.
+- **Explainability vs. Token Cost**: To provide highly accurate, priority-linked justifications, the agent passes detailed tool context and scoring weights back to the explanation LLM. While this results in transparent, user-tailored pros/cons, it increases token overhead.
+- **Dynamic Weights vs. Complexity**: Computing multi-signal scores deterministically ensures ranking accuracy, but managing dynamic normalization constraints (weights must sum to 1.0) adds complex logic to preference merging.
+
+---
+
+## 🔌 Live vs. Mocked Data
+
+To facilitate local development, testing, and continuous integration, all external APIs are currently simulated:
+- **Property Listings**: Mocked using a set of 30+ detailed properties representing realistic listings in major Indian cities.
+- **commute/transit (Google Maps)**: Mocked using predefined travel times, metro stations, and local landmarks per locality.
+- **Schools, Crime, Neighborhood**: Mocked with realistic local values (e.g. Bandra East has high walkability and IB schools; Worli has high price history appreciation).
+
+*Transitioning to Production*:
+To connect to live APIs, the wrappers in `backend/tools/` can be swapped with real HTTP clients calling:
+- **Apify / MagicBricks Scraper** for live properties.
+- **Google Routes & Places API** for transit routes, commute calculations, and local landmarks.
+- **OpenStreetMap (Overpass API / Nominatim)** for public school coordinates and walkability polygons.
+
+---
+
 ## 📄 License
 
 MIT License — see [LICENSE](LICENSE) for details.
-#   H o m e P i l o t  
- #   H o m e P i l o t  
- #   H o m e P i l o t  
- 
